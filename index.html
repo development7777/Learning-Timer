@@ -4,52 +4,41 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>学習タイマー</title>
-
-  <!-- PWA用 -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#6200ee">
-
-  <!-- Materialize CSS -->
-  <link
-    href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
-    rel="stylesheet"
-  />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet" />
   <style>
     body {
-      background: var(--bg);
-      color: var(--fg);
       margin: 0;
-      font-family: 'Roboto', sans-serif;
-      display: flex; align-items: center; justify-content: center;
+      background: var(--bg, #fafafa);
+      color: var(--fg, #333);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       height: 100vh;
-      transition: background 0.3s, color 0.3s;
-    }
-    :root {
-      --bg: #fafafa;
-      --fg: #333;
-    }
-    [data-theme="dark"] {
-      --bg: #303030;
-      --fg: #eee;
+      font-family: 'Roboto', sans-serif;
     }
     .app-card {
-      background: var(--bg);
-      box-shadow: 0 6px 24px rgba(0,0,0,0.15);
-      border-radius: 24px;
+      background: var(--bg, #fff);
       padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       width: 90%;
       max-width: 400px;
       text-align: center;
-      transition: background 0.3s;
     }
     h1 { margin-bottom: 1rem; }
-    .time-options label { margin: 0.5rem; }
-    #timer { font-size: 4rem; font-weight: bold; margin-top: 1.5rem; }
-    .btn-row { display: flex; gap: .5rem; margin-top: 1rem; }
-    .btn-large { flex: 1; }
-    .btn-flat { margin-top: .5rem; }
+    #timer {
+      font-size: 4rem;
+      font-weight: bold;
+      margin-top: 1.5rem;
+    }
+    .btn-row {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .input-field { display: none; }
   </style>
 </head>
 <body>
@@ -57,90 +46,122 @@
     <h1>学習タイマー</h1>
 
     <div class="time-options">
-      <label><input name="time" type="radio" value="5" checked><span>5分</span></label>
-      <label><input name="time" type="radio" value="10"><span>10分</span></label>
-      <label><input name="time" type="radio" value="17"><span>17分</span></label>
-      <label><input name="time" type="radio" value="25"><span>25分</span></label>
-      <label><input name="time" type="radio" value="30"><span>30分</span></label>
-      <label><input name="time" type="radio" value="52"><span>52分</span></label>
-      <label><input name="time" type="radio" value="custom"><span>カスタム</span></label>
+      <p>
+        <label><input name="time" type="radio" value="5" checked><span>5分</span></label>
+        <label><input name="time" type="radio" value="10"><span>10分</span></label>
+        <label><input name="time" type="radio" value="17"><span>17分</span></label>
+        <label><input name="time" type="radio" value="25"><span>25分</span></label>
+        <label><input name="time" type="radio" value="30"><span>30分</span></label>
+        <label><input name="time" type="radio" value="52"><span>52分</span></label>
+        <label><input name="time" type="radio" value="custom"><span>カスタム</span></label>
+      </p>
     </div>
 
-    <div class="input-field" id="customInput" style="display:none;">
+    <div class="input-field" id="customInput">
       <input id="customTime" type="number" min="1">
       <label for="customTime">カスタム分数</label>
     </div>
 
     <div class="btn-row">
-      <a id="startBtn" class="btn-large waves-effect waves-light indigo">スタート</a>
-      <a id="resetBtn" class="btn-large waves-effect waves-light red lighten-1">リセット</a>
+      <a id="startBtn" class="btn waves-effect waves-light indigo">スタート</a>
+      <a id="resetBtn" class="btn waves-effect waves-light red lighten-1">リセット</a>
     </div>
-
-    <a class="btn-flat waves-effect" id="themeToggle">ダークモード切替</a>
 
     <div id="timer">00:00</div>
   </div>
 
-  <!-- Materialize JS -->
+  <!-- 音の再生 -->
+  <audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg" preload="auto"></audio>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
 
-  <audio id="alarmSound" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
-
   <script>
-    // 初期設定
     const timerDisplay = document.getElementById('timer');
     const startBtn = document.getElementById('startBtn');
     const resetBtn = document.getElementById('resetBtn');
-    const themeToggle = document.getElementById('themeToggle');
-    const alarmSound = document.getElementById('alarmSound');
     const customInput = document.getElementById('customInput');
     const customTime = document.getElementById('customTime');
     const radios = document.querySelectorAll('input[name="time"]');
-    let timerInterval, remainingSeconds = 0;
+    const alarmSound = document.getElementById('alarmSound');
 
-    radios.forEach(radio => radio.addEventListener('change', () => {
-      customInput.style.display = (radio.value === 'custom' && radio.checked) ? 'block':'none';
-      if (radio.value==='custom') M.updateTextFields();
-    }));
+    let remainingSeconds = 0;
+    let timerInterval;
+
+    radios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (radio.value === 'custom') {
+          customInput.style.display = 'block';
+          M.updateTextFields();
+        } else {
+          customInput.style.display = 'none';
+        }
+      });
+    });
 
     function updateDisplay() {
-      const m = String(Math.floor(remainingSeconds/60)).padStart(2,'0');
-      const s = String(remainingSeconds%60).padStart(2,'0');
-      timerDisplay.textContent = `${m}:${s}`;
+      const min = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+      const sec = String(remainingSeconds % 60).padStart(2, '0');
+      timerDisplay.textContent = `${min}:${sec}`;
     }
 
-    function notify() {
-      if (Notification.permission==='granted') {
-        new Notification('タイマー終了', {body:'学習時間が終了しました！'});
+    function sendNotification() {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('タイマー終了！', {
+          body: '学習タイムが完了しました',
+          icon: './timer.png'
+        });
       }
-      alarmSound.play();
+    }
+
+    function playAlarm() {
+      alarmSound.currentTime = 0;
+      alarmSound.play().catch(err => {
+        console.log('再生エラー:', err);
+      });
+    }
+
+    function timerEnd() {
+      sendNotification();
+      playAlarm();
+      M.toast({ html: 'タイマー終了！', classes: 'green darken-2' });
     }
 
     startBtn.addEventListener('click', () => {
       clearInterval(timerInterval);
-      const sel = document.querySelector('input[name="time"]:checked').value;
-      let minutes = sel==='custom' ? parseInt(customTime.value,10) : parseInt(sel,10);
-      if (isNaN(minutes) || minutes<1) return M.toast({html:'有効な分数を入力してください'});
-      remainingSeconds = minutes*60; updateDisplay();
+      const selected = document.querySelector('input[name="time"]:checked').value;
+      let minutes = selected === 'custom' ? parseInt(customTime.value, 10) : parseInt(selected, 10);
+
+      if (isNaN(minutes) || minutes <= 0) {
+        M.toast({ html: '分数を正しく入力してください', classes: 'red darken-2' });
+        return;
+      }
+
+      remainingSeconds = minutes * 60;
+      updateDisplay();
+
       timerInterval = setInterval(() => {
         remainingSeconds--;
-        if (remainingSeconds<=0) { clearInterval(timerInterval); notify(); }
         updateDisplay();
-      },1000);
+
+        if (remainingSeconds <= 0) {
+          clearInterval(timerInterval);
+          timerEnd();
+        }
+      }, 1000);
     });
 
-    resetBtn.addEventListener('click', () => { clearInterval(timerInterval); remainingSeconds=0; updateDisplay(); });
-
-    themeToggle.addEventListener('click', () => {
-      document.documentElement.toggleAttribute('data-theme','dark');
+    resetBtn.addEventListener('click', () => {
+      clearInterval(timerInterval);
+      remainingSeconds = 0;
+      updateDisplay();
     });
-
-    // 通知の許可をリクエスト
-    if ('Notification' in window && Notification.permission==='default') {
-      Notification.requestPermission();
-    }
 
     updateDisplay();
+
+    // 通知許可の確認とリクエスト
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
 
     // Service Worker 登録
     if ('serviceWorker' in navigator) {
